@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>boAt | ULTIMATE TELEMETRY</title>
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;700;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <style>
+        :root {
+            --bg-base: #080A0F;
+            --bg-panel: rgba(20, 24, 32, 0.6);
+            --bg-panel-hover: rgba(30, 35, 45, 0.8);
+            --border-glow: rgba(255, 46, 46, 0.2);
+            --accent-red: #FF2E2E;
+            --text-main: #FFFFFF;
+            --text-muted: #8A92A3;
+            --text-highlight: #E3E4E5;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background-color: var(--bg-base);
+            color: var(--text-main);
+            min-height: 100vh;
+            overflow-x: hidden;
+            overflow-y: auto;
+            position: relative;
+            scroll-behavior: smooth;
+        }
+
+        body::-webkit-scrollbar { width: 8px; }
+        body::-webkit-scrollbar-track { background: var(--bg-base); }
+        body::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 4px; }
+        body::-webkit-scrollbar-thumb:hover { background: var(--accent-red); }
+
+        /* Atmosphere */
+        body::before {
+            content: "";
+            position: fixed;
+            top: 0; left: 0; width: 100vw; height: 100vh;
+            pointer-events: none;
+            z-index: 9999;
+            opacity: 0.015;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.7' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+        }
+
+        .ambient-glow {
+            position: fixed;
+            width: 800px; height: 800px;
+            background: radial-gradient(circle, rgba(255,46,46,0.05) 0%, rgba(0,0,0,0) 60%);
+            top: -200px; left: 20%;
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 0;
+        }
+        
+        .ambient-glow-bottom {
+            position: fixed;
+            width: 1000px; height: 1000px;
+            background: radial-gradient(circle, rgba(255,255,255,0.02) 0%, rgba(0,0,0,0) 60%);
+            bottom: -500px; right: -200px;
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        /* Marquee */
+        .marquee-container {
+            width: 100%; background: var(--accent-red); color: #000;
+            padding: 6px 0; overflow: hidden; white-space: nowrap; display: flex;
+            font-family: 'Space Mono', monospace; font-weight: 700; font-size: 0.75rem;
+            letter-spacing: 0.15em; text-transform: uppercase; z-index: 100;
+            position: relative;
+        }
+        .marquee-content { display: inline-block; animation: marquee 30s linear infinite; }
+        @keyframes marquee { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
+
+        /* Sticky Header */
+        header {
+            padding: 1rem 3rem;
+            display: flex; justify-content: space-between; align-items: center;
+            z-index: 100; position: sticky; top: 0;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            background: rgba(8, 10, 15, 0.85); backdrop-filter: blur(12px);
+        }
+        .logo { height: 28px; filter: invert(1); }
+        .header-controls { display: flex; gap: 2rem; align-items: center; }
+        .sys-status { font-family: 'Space Mono', monospace; font-size: 0.75rem; color: var(--text-muted); display: flex; gap: 1rem; }
+        .live-badge {
+            display: flex; align-items: center; gap: 8px; font-family: 'Space Mono', monospace;
+            font-size: 0.75rem; font-weight: 700; color: var(--accent-red);
+            border: 1px solid var(--border-glow); padding: 4px 10px; border-radius: 4px;
+            background: rgba(255, 46, 46, 0.05);
+        }
+        .dot { width: 6px; height: 6px; background: var(--accent-red); border-radius: 50%; animation: blink 1.5s infinite; }
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+        /* Main Scrollable Layout */
+        main {
+            padding: 2rem 3rem 6rem 3rem;
+            display: flex; flex-direction: column; gap: 3rem;
+            z-index: 10; position: relative;
+            max-width: 1800px; margin: 0 auto;
+        }
+
+        .section-title {
+            font-size: 1.5rem; font-weight: 300; letter-spacing: 0.1em;
+            text-transform: uppercase; margin-bottom: 1.5rem;
+            display: flex; align-items: center; gap: 1rem;
+        }
+        .section-title::after {
+            content: ''; flex: 1; height: 1px; background: rgba(255,255,255,0.05);
+        }
+
+        /* Grids */
+        .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.5rem; }
+        .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; }
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+        .grid-layout { display: grid; grid-template-columns: 2fr 1fr; gap: 1.5rem; }
+
+        /* Panels */
+        .panel {
+            background: var(--bg-panel); border: 1px solid rgba(255,255,255,0.06);
+            border-radius: 8px; padding: 1.5rem; display: flex; flex-direction: column;
+            transition: all 0.3s ease; position: relative;
+        }
+        .panel:hover { background: var(--bg-panel-hover); border-color: rgba(255,255,255,0.1); transform: translateY(-2px); }
+        .panel::before {
+            content: ''; position: absolute; top: 0; left: 0; width: 0; height: 2px;
+            background: var(--accent-red); transition: width 0.4s ease;
+        }
+        .panel:hover::before { width: 100%; }
+
+        .panel-header {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 1.5rem; padding-bottom: 0.75rem;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+        .panel-title {
+            font-size: 0.75rem; font-weight: 700; letter-spacing: 0.1em;
+            text-transform: uppercase; color: var(--text-muted); font-family: 'Space Mono', monospace;
+        }
+
+        /* Typography inside panels */
+        .val-huge { font-size: 3.5rem; font-weight: 700; line-height: 1; font-family: 'Space Mono', monospace; color: #FFF; }
+        .val-large { font-size: 2.5rem; font-weight: 700; font-family: 'Space Mono', monospace; color: #FFF; }
+        .val-med { font-size: 1.5rem; font-weight: 600; font-family: 'Space Mono', monospace; color: #FFF; }
+        .label-sub { font-size: 0.8rem; color: var(--text-muted); margin-top: 0.5rem; display: flex; align-items: center; gap: 0.5rem; font-family: 'Space Mono', monospace;}
+        
+        .trend-up { color: #00FF66; } .trend-down { color: #FF2E2E; }
+
+        /* Scroll Animations via class */
+        .reveal { opacity: 0; transform: translateY(30px); transition: all 0.8s cubic-bezier(0.16, 1, 0.3, 1); }
+        .reveal.active { opacity: 1; transform: translateY(0); }
+
+        /* Tables & Lists */
+        .data-table { width: 100%; border-collapse: collapse; font-family: 'Space Mono', monospace; font-size: 0.8rem; }
+        .data-table th { text-align: left; padding: 1rem; color: var(--text-muted); border-bottom: 1px solid rgba(255,255,255,0.05); font-weight: 600; }
+        .data-table td { padding: 1rem; border-bottom: 1px solid rgba(255,255,255,0.02); color: #FFF; }
+        .data-table tr:hover td { background: rgba(255,255,255,0.02); }
+
+        .data-list { display: flex; flex-direction: column; gap: 0.75rem; }
+        .data-row { display: flex; justify-content: space-between; padding: 0.75rem; background: rgba(255,255,255,0.02); border-left: 2px solid rgba(255,255,255,0.1); font-family: 'Space Mono', monospace; font-size: 0.8rem; }
+        .data-row:hover { border-left-color: var(--accent-red); background: rgba(255,46,46,0.05); }
+
+        /* Chart Wrappers */
+        .chart-container { position: relative; width: 100%; flex: 1; min-height: 250px; }
+        
+        /* Custom Progress Bars */
+        .bar-wrap { margin-bottom: 1.2rem; }
+        .bar-label { display: flex; justify-content: space-between; font-size: 0.8rem; font-weight: 600; margin-bottom: 6px; font-family: 'Space Mono', monospace; color: var(--text-main); }
+        .bar-bg { height: 6px; background: rgba(255,255,255,0.05); border-radius: 3px; overflow: hidden; }
+        .bar-fill { height: 100%; background: var(--text-muted); width: 0; transition: width 1.5s cubic-bezier(0.16, 1, 0.3, 1); }
+        .bar-fill.highlight { background: var(--accent-red); box-shadow: 0 0 10px rgba(255,46,46,0.4); }
+
+    </style>
+</head>
+<body>
+
+    <div class="ambient-glow"></div>
+    <div class="ambient-glow-bottom"></div>
+
+    <!-- Marquee -->
+    <div class="marquee-container">
+        <div class="marquee-content">
+            SYS.TELEMETRY: ONLINE // MARKET_SHARE: #1 AUDIO BRAND IN INDIA // UNITS_DISTRIBUTED_YTD: 45.2M // YOY_GROWTH: 124% // ACTIVE_USERS_LIVE: 142,891 // 
+            SYS.TELEMETRY: ONLINE // MARKET_SHARE: #1 AUDIO BRAND IN INDIA // UNITS_DISTRIBUTED_YTD: 45.2M // YOY_GROWTH: 124% // ACTIVE_USERS_LIVE: 142,891 // 
+        </div>
+    </div>
+
+    <header>
+        <img src="https://www.boat-lifestyle.com/cdn/shop/files/boAt_logo_black_24889e30-925c-4185-a028-9fef497a8e44.svg?v=1732879339" alt="boAt Logo" class="logo">
+        <div class="header-controls">
+            <div class="sys-status"><span>UPTIME: 99.99%</span><span>LATENCY: 12ms</span></div>
+            <div class="live-badge"><div class="dot"></div> LIVE SYNC</div>
+        </div>
+    </header>
+
+    <main>
+        <!-- SECTION: GLOBAL OVERVIEW -->
+        <section>
+            <div class="section-title reveal">Global Overview</div>
+            <div class="grid-4">
+                <div class="panel reveal" style="border-color: rgba(255,46,46,0.3); background: rgba(255,46,46,0.03);">
+                    <div class="panel-header"><div class="panel-title">Market Position</div></div>
+                    <div class="val-huge" style="color: var(--accent-red);">#1</div>
+                    <div class="label-sub">HEADPHONE BRAND (INDIA)</div>
+                </div>
+                <div class="panel reveal">
+                    <div class="panel-header"><div class="panel-title">Total Revenue YTD</div></div>
+                    <div class="val-large">₹1.24B</div>
+                    <div class="label-sub"><span class="trend-up">▲ 14.2%</span> vs Q3</div>
+                </div>
+                <div class="panel reveal">
+                    <div class="panel-header"><div class="panel-title">Units Sold</div></div>
+                    <div class="val-large">45.2M</div>
+                    <div class="label-sub"><span class="trend-up">▲ 124%</span> YoY</div>
+                </div>
+                <div class="panel reveal">
+                    <div class="panel-header"><div class="panel-title">Live Active Users</div></div>
+                    <div class="val-large" id="live-users">142,891</div>
+                    <div class="label-sub">Website & App Traffic</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION: FINANCIAL & TRAJECTORY -->
+        <section>
+            <div class="section-title reveal">Financial Trajectory</div>
+            <div class="grid-layout">
+                <div class="panel reveal">
+                    <div class="panel-header">
+                        <div class="panel-title">Trailing 12 Months Revenue (Millions)</div>
+                    </div>
+                    <div class="chart-container" style="height: 350px;">
+                        <canvas id="mainChart"></canvas>
+                    </div>
+                </div>
+                <div class="panel reveal">
+                    <div class="panel-header">
+                        <div class="panel-title">Quarterly Segment Growth</div>
+                    </div>
+                    <div class="chart-container" style="height: 350px;">
+                        <canvas id="barChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION: PRODUCT PORTFOLIO -->
+        <section>
+            <div class="section-title reveal">Product Portfolio Deep-Dive</div>
+            <div class="grid-3">
+                
+                <div class="panel reveal">
+                    <div class="panel-header"><div class="panel-title">Category Distribution</div></div>
+                    <div class="chart-container" style="height: 250px;">
+                        <canvas id="donutChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="panel reveal">
+                    <div class="panel-header"><div class="panel-title">Demographic Appeal (Age)</div></div>
+                    <div class="chart-container" style="height: 250px;">
+                        <canvas id="polarChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="panel reveal">
+                    <div class="panel-header"><div class="panel-title">Product Line Penetration</div></div>
+                    <div style="display: flex; flex-direction: column; justify-content: center; height: 100%;">
+                        <div class="bar-wrap">
+                            <div class="bar-label"><span>NIRVANA ANC</span><span style="color:var(--accent-red);">95%</span></div>
+                            <div class="bar-bg"><div class="bar-fill highlight" data-target="95%"></div></div>
+                        </div>
+                        <div class="bar-wrap">
+                            <div class="bar-label"><span>AIRDOPES (TWS)</span><span>82%</span></div>
+                            <div class="bar-bg"><div class="bar-fill" data-target="82%"></div></div>
+                        </div>
+                        <div class="bar-wrap">
+                            <div class="bar-label"><span>ROCKERZ (NECKBAND)</span><span>68%</span></div>
+                            <div class="bar-bg"><div class="bar-fill" data-target="68%" style="background:#888;"></div></div>
+                        </div>
+                        <div class="bar-wrap">
+                            <div class="bar-label"><span>SMARTWATCHES</span><span>45%</span></div>
+                            <div class="bar-bg"><div class="bar-fill" data-target="45%" style="background:#555;"></div></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Huge Data Table -->
+            <div class="panel reveal" style="margin-top: 1.5rem;">
+                <div class="panel-header"><div class="panel-title">Top SKU Performance</div></div>
+                <div style="overflow-x: auto;">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>SKU ID</th>
+                                <th>Product Name</th>
+                                <th>Category</th>
+                                <th>Units Sold (YTD)</th>
+                                <th>Revenue</th>
+                                <th>MoM Growth</th>
+                                <th>Stock Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>B084Z</td><td>Airdopes 141</td><td>TWS</td><td>1.2M</td><td>₹180M</td><td class="trend-up">+12.4%</td><td><span style="color:#00FF66;">IN STOCK</span></td>
+                            </tr>
+                            <tr>
+                                <td>B091X</td><td>Rockerz 255 Pro+</td><td>Neckband</td><td>950K</td><td>₹142M</td><td class="trend-up">+5.2%</td><td><span style="color:#00FF66;">IN STOCK</span></td>
+                            </tr>
+                            <tr>
+                                <td>B075Y</td><td>Nirvana Ion</td><td>TWS</td><td>820K</td><td>₹205M</td><td class="trend-up">+24.1%</td><td style="color:var(--accent-red);">LOW STOCK</td>
+                            </tr>
+                            <tr>
+                                <td>B102A</td><td>Wave Call</td><td>Smartwatch</td><td>640K</td><td>₹115M</td><td class="trend-down">-2.1%</td><td><span style="color:#00FF66;">IN STOCK</span></td>
+                            </tr>
+                            <tr>
+                                <td>B023W</td><td>Stone 1000</td><td>Speaker</td><td>410K</td><td>₹120M</td><td class="trend-up">+1.8%</td><td><span style="color:#00FF66;">IN STOCK</span></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION: GEOGRAPHY & LIVE OPS -->
+        <section>
+            <div class="section-title reveal">Live Operations & Geography</div>
+            <div class="grid-2">
+                <div class="panel reveal">
+                    <div class="panel-header"><div class="panel-title">Regional Distribution Network</div></div>
+                    <div class="grid-2" style="margin-bottom: 2rem;">
+                        <div>
+                            <div class="val-large">NORTH</div>
+                            <div class="val-med" style="color:var(--accent-red);">18.2M Units</div>
+                            <div class="label-sub">34 Active Hubs</div>
+                        </div>
+                        <div>
+                            <div class="val-large">SOUTH</div>
+                            <div class="val-med">14.5M Units</div>
+                            <div class="label-sub">28 Active Hubs</div>
+                        </div>
+                        <div>
+                            <div class="val-large">WEST</div>
+                            <div class="val-med">8.1M Units</div>
+                            <div class="label-sub">12 Active Hubs</div>
+                        </div>
+                        <div>
+                            <div class="val-large">EAST</div>
+                            <div class="val-med">4.4M Units</div>
+                            <div class="label-sub">9 Active Hubs</div>
+                        </div>
+                    </div>
+                    <div class="chart-container" style="height: 150px;">
+                        <canvas id="regionChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="panel reveal">
+                    <div class="panel-header">
+                        <div class="panel-title">Live Transaction Feed</div>
+                        <div class="dot"></div>
+                    </div>
+                    <div class="data-list" id="tx-feed" style="height: 350px; overflow-y: hidden;">
+                        <!-- JS populated -->
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <script>
+        // Reveal Animations on Scroll
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('active');
+                    // If it has progress bars, trigger them
+                    const bars = entry.target.querySelectorAll('.bar-fill');
+                    bars.forEach(bar => { bar.style.width = bar.getAttribute('data-target'); });
+                }
+            });
+        }, { threshold: 0.1 });
+
+        document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+
+        // Chart.js Configuration
+        Chart.defaults.color = '#8A92A3';
+        Chart.defaults.font.family = "'Space Mono', monospace";
+        Chart.defaults.font.size = 10;
+        
+        const tooltipConfig = {
+            backgroundColor: 'rgba(20, 24, 32, 0.95)',
+            titleColor: '#FFFFFF',
+            titleFont: { family: 'Outfit', size: 12, weight: '700' },
+            bodyColor: '#FF2E2E',
+            bodyFont: { family: 'Space Mono', size: 12, weight: '700' },
+            padding: 10,
+            borderColor: 'rgba(255, 46, 46, 0.3)',
+            borderWidth: 1,
+            cornerRadius: 4,
+            displayColors: false
+        };
+
+        const gridConfig = { color: 'rgba(255, 255, 255, 0.03)', drawBorder: false, tickLength: 0 };
+
+        // 1. Main Line Chart
+        const ctxMain = document.getElementById('mainChart').getContext('2d');
+        const mainGrad = ctxMain.createLinearGradient(0, 0, 0, 350);
+        mainGrad.addColorStop(0, 'rgba(255, 46, 46, 0.25)');
+        mainGrad.addColorStop(1, 'rgba(255, 46, 46, 0.0)');
+        new Chart(ctxMain, {
+            type: 'line',
+            data: {
+                labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+                datasets: [{
+                    data: [120, 145, 160, 210, 195, 240, 280, 260, 320, 390, 450, 520],
+                    borderColor: '#FF2E2E', borderWidth: 2, backgroundColor: mainGrad, fill: true, tension: 0.1,
+                    pointBackgroundColor: '#080A0F', pointBorderColor: '#FF2E2E', pointRadius: 4, pointHoverRadius: 8
+                }]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { display: false }, tooltip: tooltipConfig },
+                scales: { y: { grid: gridConfig, border: {display:false} }, x: { grid: {display:false}, border: {display:false} } }
+            }
+        });
+
+        // 2. Stacked Bar Chart
+        const ctxBar = document.getElementById('barChart').getContext('2d');
+        new Chart(ctxBar, {
+            type: 'bar',
+            data: {
+                labels: ['Q1', 'Q2', 'Q3', 'Q4'],
+                datasets: [
+                    { label: 'TWS', data: [42, 51, 68, 84], backgroundColor: '#FFFFFF', borderRadius: 2 },
+                    { label: 'Neckbands', data: [31, 32, 35, 41], backgroundColor: '#666666', borderRadius: 2 },
+                    { label: 'Watches', data: [8, 15, 22, 34], backgroundColor: '#FF2E2E', borderRadius: 2 }
+                ]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { display: false }, tooltip: tooltipConfig },
+                scales: { y: { stacked: true, grid: gridConfig, border: {display:false} }, x: { stacked: true, grid: {display:false}, border: {display:false} } }
+            }
+        });
+
+        // 3. Donut Chart
+        const ctxDonut = document.getElementById('donutChart').getContext('2d');
+        new Chart(ctxDonut, {
+            type: 'doughnut',
+            data: {
+                labels: ['TWS', 'Neckbands', 'Headphones', 'Watches'],
+                datasets: [{
+                    data: [42, 38, 12, 8],
+                    backgroundColor: ['#FF2E2E', '#FFFFFF', '#666666', '#333333'],
+                    borderWidth: 2, borderColor: '#141820', hoverOffset: 6
+                }]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false, cutout: '75%',
+                plugins: { legend: { position: 'right', labels: { usePointStyle: true, boxWidth: 6, font: {size:10} } }, tooltip: tooltipConfig }
+            }
+        });
+
+        // 4. Polar Area Chart (Demographics)
+        const ctxPolar = document.getElementById('polarChart').getContext('2d');
+        new Chart(ctxPolar, {
+            type: 'polarArea',
+            data: {
+                labels: ['18-24', '25-34', '35-44', '45+'],
+                datasets: [{
+                    data: [45, 30, 15, 10],
+                    backgroundColor: [
+                        'rgba(255, 46, 46, 0.8)',
+                        'rgba(255, 255, 255, 0.8)',
+                        'rgba(136, 136, 136, 0.8)',
+                        'rgba(51, 51, 51, 0.8)'
+                    ],
+                    borderWidth: 1,
+                    borderColor: '#141820'
+                }]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { position: 'right', labels: { usePointStyle: true, boxWidth: 6, font: {size:10} } }, tooltip: tooltipConfig },
+                scales: { r: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { display: false } } }
+            }
+        });
+
+        // 5. Region Radar Chart
+        const ctxRegion = document.getElementById('regionChart').getContext('2d');
+        new Chart(ctxRegion, {
+            type: 'bar',
+            indexAxis: 'y',
+            data: {
+                labels: ['NORTH', 'SOUTH', 'WEST', 'EAST'],
+                datasets: [{
+                    data: [18.2, 14.5, 8.1, 4.4],
+                    backgroundColor: ['#FF2E2E', '#FFFFFF', '#888888', '#444444'],
+                    borderRadius: 4
+                }]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { display: false }, tooltip: tooltipConfig },
+                scales: { x: { display: false }, y: { grid: {display:false}, border: {display:false} } }
+            }
+        });
+
+
+        // Live Transactions Logic
+        const feed = document.getElementById('tx-feed');
+        const items = ['Nirvana Ion', 'Airdopes 141', 'Wave Call', 'Rockerz 255 Pro+', 'PartyPal 30', 'Stone 1000'];
+        const prices = ['₹1,899', '₹1,299', '₹1,699', '₹1,499', '₹3,299', '₹2,299'];
+        
+        // Initial populate
+        for(let i=0; i<7; i++) { addTx(false); }
+
+        function addTx(animate = true) {
+            const randIdx = Math.floor(Math.random() * items.length);
+            const txId = 'TX-' + Math.floor(10000 + Math.random() * 90000) + String.fromCharCode(65 + Math.floor(Math.random() * 26));
+            
+            const newRow = document.createElement('div');
+            newRow.className = 'data-row';
+            if(animate) {
+                newRow.style.opacity = '0';
+                newRow.style.transform = 'translateX(-20px)';
+                newRow.style.transition = 'all 0.4s ease';
+            }
+            newRow.innerHTML = `<span>${txId}</span><span style="color:#FFF;">${items[randIdx]}</span><span>${prices[randIdx]}</span>`;
+            
+            feed.insertBefore(newRow, feed.firstChild);
+            
+            if(animate) {
+                setTimeout(() => { newRow.style.opacity = '1'; newRow.style.transform = 'translateX(0)'; }, 20);
+            }
+            
+            if (feed.children.length > 7) { feed.removeChild(feed.lastChild); }
+        }
+
+        setInterval(() => addTx(true), 2000);
+
+        // Live user counter logic
+        const liveUsersEl = document.getElementById('live-users');
+        let currentUsers = 142891;
+        setInterval(() => {
+            const change = Math.floor(Math.random() * 50) - 20; // fluctuate
+            currentUsers += change;
+            liveUsersEl.innerText = currentUsers.toLocaleString();
+            
+            // Add a subtle flash effect on update
+            liveUsersEl.style.textShadow = '0 0 15px rgba(255,255,255,0.8)';
+            setTimeout(() => { liveUsersEl.style.textShadow = 'none'; }, 300);
+        }, 3500);
+
+    </script>
+</body>
+</html>
