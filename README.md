@@ -23,6 +23,7 @@ The Boat Dashboard is designed to present important marine and vessel-related in
 - HTML5
 - CSS3
 - JavaScript (ES6+)
+- Python
 - Firecrawl (Web Scraping & Data Collection)
 
 ## 🔥 Firecrawl Integration
